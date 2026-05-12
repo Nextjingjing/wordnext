@@ -30,7 +30,7 @@ class SqliteVocabRepository implements VocabRepository {
   @override
   Future<void> saveVocab(Vocab vocab) async {
     final db = await dbHelper.database;
-    
+
     // Perform an update since the database is pre-populated
     await db.update(
       'vocabs',
@@ -56,7 +56,7 @@ class SqliteVocabRepository implements VocabRepository {
     );
 
     if (maps.isEmpty) return null;
-    
+
     return Vocab(
       id: maps[0]['id'],
       word: maps[0]['word'],
@@ -73,17 +73,13 @@ class SqliteVocabRepository implements VocabRepository {
   @override
   Future<void> deleteVocab(int id) async {
     final db = await dbHelper.database;
-    await db.delete(
-      'vocabs',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    await db.delete('vocabs', where: 'id = ?', whereArgs: [id]);
   }
 
   @override
   Future<Vocab?> getById(int id) async {
     final db = await dbHelper.database;
-    
+
     // Query the table for a specific ID
     final List<Map<String, dynamic>> maps = await db.query(
       'vocabs',
@@ -121,22 +117,32 @@ class SqliteVocabRepository implements VocabRepository {
       orderBy: 'id ASC',
     );
 
-    return maps.map((map) => Vocab(
-      id: map['id'],
-      word: map['word'],
-      translated: map['translated'],
-      partOfSpeech: map['part_of_speech'] ?? '',
-      definitionEn: map['definition_en'] ?? '',
-      exampleSentence: map['example_sentence'] ?? '',
-      strength: map['strength'] ?? 0,
-      lastReview: DateTime.parse(map['last_review']),
-      isLearned: map['is_learned'] == 1,
-    )).toList();
+    return maps
+        .map(
+          (map) => Vocab(
+            id: map['id'],
+            word: map['word'],
+            translated: map['translated'],
+            partOfSpeech: map['part_of_speech'] ?? '',
+            definitionEn: map['definition_en'] ?? '',
+            exampleSentence: map['example_sentence'] ?? '',
+            strength: map['strength'] ?? 0,
+            lastReview: DateTime.parse(map['last_review']),
+            isLearned: map['is_learned'] == 1,
+          ),
+        )
+        .toList();
   }
-  
+
   @override
-  Future<List<Vocab>> getWhereLearned(bool isLearned) async {
-    final db = await dbHelper.database; // เปลี่ยนจาก database เป็น dbHelper.database
+  Future<List<Vocab>> getWhereLearned({
+    required bool isLearned,
+    int limit = 20,
+    int offset = 0,
+    bool newestFirst = false,
+  }) async {
+    final db = await dbHelper.database;
+    final String orderBy = newestFirst ? 'last_review DESC' : 'last_review ASC';
 
     final int learnedValue = isLearned ? 1 : 0;
 
@@ -144,7 +150,9 @@ class SqliteVocabRepository implements VocabRepository {
       'vocabs',
       where: 'is_learned = ?',
       whereArgs: [learnedValue],
-      orderBy: 'id ASC',
+      orderBy: orderBy,
+      limit: limit,
+      offset: offset,
     );
 
     return List.generate(maps.length, (i) {

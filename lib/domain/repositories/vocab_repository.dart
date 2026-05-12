@@ -21,6 +21,11 @@ abstract class VocabRepository {
   /// Fetches vocabularies within a specific ID range (e.g., from ID x to y).
   Future<List<Vocab>> getVocabsInRange(int startId, int endId);
 
-  /// Fetches vocabularies based on their learned status.
-  Future<List<Vocab>> getWhereLearned(bool isLearned);
+  /// Fetches vocabularies that are due for learning/review.
+  Future<List<Vocab>> getWhereLearned({
+    required bool isLearned,
+    int limit = 20,
+    int offset = 0,
+    bool newestFirst = true,
+  });
 }
