@@ -133,4 +133,32 @@ class SqliteVocabRepository implements VocabRepository {
       isLearned: map['is_learned'] == 1,
     )).toList();
   }
+  
+  @override
+  Future<List<Vocab>> getWhereLearned(bool isLearned) async {
+    final db = await dbHelper.database; // เปลี่ยนจาก database เป็น dbHelper.database
+
+    final int learnedValue = isLearned ? 1 : 0;
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'vocabs',
+      where: 'is_learned = ?',
+      whereArgs: [learnedValue],
+      orderBy: 'id ASC',
+    );
+
+    return List.generate(maps.length, (i) {
+      return Vocab(
+        id: maps[i]['id'],
+        word: maps[i]['word'],
+        translated: maps[i]['translated'],
+        partOfSpeech: maps[i]['part_of_speech'] ?? '',
+        definitionEn: maps[i]['definition_en'] ?? '',
+        exampleSentence: maps[i]['example_sentence'] ?? '',
+        strength: maps[i]['strength'] ?? 0,
+        lastReview: DateTime.parse(maps[i]['last_review']),
+        isLearned: maps[i]['is_learned'] == 1,
+      );
+    });
+  }
 }

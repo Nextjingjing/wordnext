@@ -30,9 +30,7 @@ class VocabService {
   /// Fetches words that have not been learned yet.
   /// Logic: Filters for entries where [isLearned] is false.
   Future<List<Vocab>> getWordsToLearn({int limit = 10}) async {
-    final allVocabs = await _repository.getAllVocabs();
-    
-    final newWords = allVocabs.where((v) => !v.isLearned).toList();
+    final newWords = await _repository.getWhereLearned(false);
 
     return newWords.take(limit).toList();
   }
@@ -44,14 +42,13 @@ class VocabService {
   /// Finds vocabularies for review based on Spaced Repetition logic.
   /// Logic: Only includes words already marked as [isLearned].
   Future<List<Vocab>> findVocabsForReview({int limit = 10}) async {
-    final allVocabs = await _repository.getAllVocabs();
+    final learnedWords = await _repository.getWhereLearned(true);
     final now = DateTime.now();
 
     // 1. Filter: Must be learned and passed the 15-minute cooldown period
-    final candidates = allVocabs.where((v) {
-      final hasBeenLearned = v.isLearned; 
+    final candidates = learnedWords.where((v) {
       final isCooldownOver = now.difference(v.lastReview).inMinutes >= 15;
-      return hasBeenLearned && isCooldownOver;
+      return isCooldownOver;
     }).toList();
 
     if (candidates.isEmpty) return [];
@@ -93,5 +90,11 @@ class VocabService {
 
     // Persist changes to the data layer
     await _repository.saveVocab(updatedVocab);
+  }
+
+  /// Retrieves all vocabularies that have been marked as learned.
+  Future<List<Vocab>> getLearnedVocabs() async {
+    final learnedWords = await _repository.getWhereLearned(true);
+    return learnedWords;
   }
 }
