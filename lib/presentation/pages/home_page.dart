@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../domain/services/vocab_service.dart';
 import '../../domain/entities/vocab.dart';
 import 'learning_page.dart';
+import 'dictionary_page.dart';
 
 class HomePage extends StatefulWidget {
   final VocabService vocabService;
@@ -78,6 +79,21 @@ class _HomePageState extends State<HomePage> {
                     icon: Icons.psychology,
                     color: Colors.orangeAccent,
                     onTap: () => _startSession(isReview: true),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildSessionCard(
+                    title: "Dictionary",
+                    subtitle: "Browse all words and filters",
+                    countText: "Search & explore",
+                    icon: Icons.menu_book,
+                    color: Colors.teal,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            DictionaryPage(vocabService: widget.vocabService),
+                      ),
+                    ).then((_) => _refreshStats()),
                   ),
                 ],
               ),

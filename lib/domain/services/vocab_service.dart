@@ -56,15 +56,12 @@ class VocabService {
     // 2. Weight Calculation: Priority = TimeSinceLastReview / (Strength + 1)
     final scoredList = candidates.map((vocab) {
       final minsSinceReview = now.difference(vocab.lastReview).inMinutes;
-      
+
       // Proficient words (high strength) get lower scores to appear less often
       double score = minsSinceReview / (vocab.strength + 1);
 
       // Apply small random noise to vary the order slightly
-      return {
-        'vocab': vocab, 
-        'score': score + (_random.nextDouble() * 5.0)
-      };
+      return {'vocab': vocab, 'score': score + (_random.nextDouble() * 5.0)};
     }).toList();
 
     // 3. Sort by score DESC (Highest score = Most urgent)
@@ -79,8 +76,8 @@ class VocabService {
   /// Automatically marks the word as [isLearned] upon the first review.
   Future<void> reviewVocab(Vocab vocab, bool isCorrect) async {
     // Update strength based on correctness
-    Vocab updatedVocab = isCorrect 
-        ? vocab.increaseStrength() 
+    Vocab updatedVocab = isCorrect
+        ? vocab.increaseStrength()
         : vocab.decreaseStrength();
 
     // Transition from "New" to "Learned" status
@@ -96,5 +93,27 @@ class VocabService {
   Future<List<Vocab>> getLearnedVocabs() async {
     final learnedWords = await _repository.getWhereLearned(isLearned: true);
     return learnedWords;
+  }
+
+  Future<List<Vocab>> getMany({required int limit, required int offset}) {
+    return _repository.getMany(limit: limit, offset: offset);
+  }
+
+  Future<List<Vocab>> getWhereLearned({
+    required bool isLearned,
+    required int limit,
+    required int offset,
+    bool newestFirst = true,
+  }) {
+    return _repository.getWhereLearned(
+      isLearned: isLearned,
+      limit: limit,
+      offset: offset,
+      newestFirst: newestFirst,
+    );
+  }
+
+  Future<int> getTotalCount({int? learnedStatus}) {
+  return _repository.countFilteredVocabs(learnedStatus: learnedStatus);
   }
 }

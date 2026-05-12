@@ -28,4 +28,13 @@ abstract class VocabRepository {
     int offset = 0,
     bool newestFirst = true,
   });
+
+  /// Fetches a paginated list of vocabularies without filtering by learned status.
+  Future<List<Vocab>> getMany({
+    int limit = 20,
+    int offset = 0,
+  });
+
+  /// Counts the total number of vocabularies, optionally filtered by learned status.
+  Future<int> countFilteredVocabs({int? learnedStatus});
 }

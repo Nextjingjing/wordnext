@@ -1,4 +1,5 @@
 import '../../domain/entities/vocab.dart';
+import 'package:sqflite/sqflite.dart';
 import '../../domain/repositories/vocab_repository.dart';
 import '../database/database_helper.dart';
 
@@ -168,5 +169,54 @@ class SqliteVocabRepository implements VocabRepository {
         isLearned: maps[i]['is_learned'] == 1,
       );
     });
+  }
+
+  @override
+  Future<List<Vocab>> getMany({int limit = 20, int offset = 0}) async {
+    final db = await dbHelper.database;
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'vocabs',
+      limit: limit,
+      offset: offset,
+      orderBy: 'id ASC',
+    );
+
+    return maps
+        .map(
+          (map) => Vocab(
+            id: map['id'],
+            word: map['word'],
+            translated: map['translated'],
+            partOfSpeech: map['part_of_speech'] ?? '',
+            definitionEn: map['definition_en'] ?? '',
+            exampleSentence: map['example_sentence'] ?? '',
+            strength: map['strength'] ?? 0,
+            lastReview: DateTime.parse(map['last_review']),
+            isLearned: map['is_learned'] == 1,
+          ),
+        )
+        .toList();
+  }
+
+  @override
+  Future<int> countFilteredVocabs({int? learnedStatus}) async {
+    final db = await dbHelper.database;
+
+    String whereClause = "";
+    List<dynamic> whereArgs = [];
+
+    if (learnedStatus != null) {
+      whereClause = "WHERE is_learned = ?";
+      whereArgs = [learnedStatus];
+    }
+
+    // rawQuery returns a List of Maps. We get the 'total' from the first row.
+    final List<Map<String, dynamic>> result = await db.rawQuery(
+      'SELECT COUNT(*) as total FROM vocabs $whereClause',
+      whereArgs,
+    );
+
+    return Sqflite.firstIntValue(result) ?? 0;
   }
 }
