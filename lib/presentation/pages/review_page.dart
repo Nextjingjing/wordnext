@@ -260,14 +260,12 @@ class _ReviewPageState extends State<ReviewPage> {
               children: [
                 ..._spellingOptions.map((char) => _letterButton(char)).toList(),
 
-                // ปุ่มลบ
                 _actionButton(
                   icon: Icons.backspace_outlined,
                   color: Colors.orange,
                   onTap: _userInputs.isNotEmpty ? _undoSpelling : null,
                 ),
 
-                // ปุ่มส่งคำตอบ (Submit)
                 _actionButton(
                   icon: Icons.check_circle_outline,
                   color: Colors.green,
@@ -278,7 +276,7 @@ class _ReviewPageState extends State<ReviewPage> {
             const SizedBox(height: 40),
           ],
         );
-      // Stage อื่นๆ (meaning, summary) เหมือนเดิม...
+      // Stage
       case ReviewStep.meaning:
         return Column(
           children: [
