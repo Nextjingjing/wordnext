@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../../domain/entities/vocab.dart';
 import '../../domain/services/vocab_service.dart';
+import '../../infrastructure/tts/tts_config.dart';
 
 class ReviewPage extends StatefulWidget {
   final List<Vocab> words;
@@ -36,6 +37,7 @@ class _ReviewPageState extends State<ReviewPage> {
   @override
   void initState() {
     super.initState();
+    configureTtsForPlatform(_tts);
     if (widget.words.isNotEmpty) {
       _setupCurrentWord();
     }

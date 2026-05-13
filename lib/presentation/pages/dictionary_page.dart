@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../../domain/entities/vocab.dart';
 import '../../domain/services/vocab_service.dart';
+import '../../infrastructure/tts/tts_config.dart';
 
 class DictionaryPage extends StatefulWidget {
   final VocabService vocabService;
@@ -30,6 +31,7 @@ class _DictionaryPageState extends State<DictionaryPage> {
   @override
   void initState() {
     super.initState();
+    configureTtsForPlatform(_tts);
     _initialFetch();
   }
 

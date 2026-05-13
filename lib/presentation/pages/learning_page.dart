@@ -4,6 +4,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'dart:math';
 import '../../domain/entities/vocab.dart';
 import '../../domain/services/vocab_service.dart';
+import '../../infrastructure/tts/tts_config.dart';
 
 class LearningPage extends StatefulWidget {
   final List<Vocab> words;
@@ -35,6 +36,7 @@ class _LearningPageState extends State<LearningPage> {
   @override
   void initState() {
     super.initState();
+    configureTtsForPlatform(_tts);
     _prepareWordSession();
   }
 
