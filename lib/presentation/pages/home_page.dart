@@ -76,7 +76,7 @@ class _HomePageState extends State<HomePage> {
                   _buildSessionCard(
                     title: "Review Session",
                     subtitle: "Spaced Repetition System",
-                    countText: "Smart scheduling",
+                    countText: "Active Recall",
                     icon: Icons.psychology,
                     color: Colors.orangeAccent,
                     onTap: () => _startSession(isReview: true),
@@ -84,8 +84,8 @@ class _HomePageState extends State<HomePage> {
                   const SizedBox(height: 16),
                   _buildSessionCard(
                     title: "Dictionary",
-                    subtitle: "Browse all words and filters",
-                    countText: "Search & explore",
+                    subtitle: "Browse all words",
+                    countText: "explore",
                     icon: Icons.menu_book,
                     color: Colors.teal,
                     onTap: () => Navigator.push(
