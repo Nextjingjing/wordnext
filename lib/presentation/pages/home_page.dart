@@ -3,6 +3,7 @@ import '../../domain/services/vocab_service.dart';
 import '../../domain/entities/vocab.dart';
 import 'learning_page.dart';
 import 'dictionary_page.dart';
+import 'review_page.dart';
 
 class HomePage extends StatefulWidget {
   final VocabService vocabService;
@@ -254,10 +255,9 @@ class _HomePageState extends State<HomePage> {
       sessionWords = await widget.vocabService.getWordsToLearn(limit: 10);
     }
 
-    // 2. Build-in safety check for asynchronous calls in Flutter
     if (!mounted) return;
 
-    // 3. Handle Empty State
+    // 2. Handle Empty State
     if (sessionWords.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -272,18 +272,23 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    // 4. Navigate to the learning/review page
+    // 3. Navigate based on isReview flag
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => LearningPage(
-          words: sessionWords,
-          vocabService: widget.vocabService,
-        ),
+        builder: (context) => isReview
+            ? ReviewPage(
+                words: sessionWords,
+                vocabService: widget.vocabService,
+              )
+            : LearningPage(
+                words: sessionWords,
+                vocabService: widget.vocabService,
+              ),
       ),
     );
 
-    // 5. Refresh statistics automatically after returning to Home
+    // 4. Refresh statistics automatically after returning
     if (mounted) {
       _refreshStats();
     }

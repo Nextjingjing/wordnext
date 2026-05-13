@@ -45,9 +45,9 @@ class VocabService {
     final learnedWords = await _repository.getWhereLearned(isLearned: true);
     final now = DateTime.now();
 
-    // 1. Filter: Must be learned and passed the 15-minute cooldown period
+    // 1. Filter: Must be learned and passed the 5-minute cooldown period
     final candidates = learnedWords.where((v) {
-      final isCooldownOver = now.difference(v.lastReview).inMinutes >= 15;
+      final isCooldownOver = now.difference(v.lastReview).inMinutes >= 5;
       return isCooldownOver;
     }).toList();
 

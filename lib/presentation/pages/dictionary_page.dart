@@ -15,91 +15,90 @@ class _DictionaryPageState extends State<DictionaryPage> {
   final FlutterTts _tts = FlutterTts();
   final ScrollController _pageScrollController = ScrollController();
   
-  // Data State
+  // Data list and loading state
   List<Vocab> _words = [];
   bool _isLoading = false;
   
-  // Dynamic Pagination State
+  // Pagination variables
   int _currentPage = 1;
   final int _itemsPerPage = 50;
   int _totalCount = 0;
   int _totalPages = 0;
 
-  // Filter State: null = All, 1 = Learned, 0 = Not Learned
-  int? _filterLearned; 
-  bool _newestFirst = true;
+  final Map<int, int> _pageLearnedCounts = {};
 
   @override
   void initState() {
     super.initState();
-    _refreshData(resetPage: true);
+    _initialFetch();
   }
 
-  /// Fetches the dynamic count and the specific page data from the DB
-  Future<void> _refreshData({bool resetPage = false}) async {
-    if (resetPage) _currentPage = 1;
-    
+  Future<void> _initialFetch() async {
     setState(() => _isLoading = true);
-
     try {
-      // 1. Get the actual total count based on current filter from Database
-      final int count = await widget.vocabService.getTotalCount(
-        learnedStatus: _filterLearned
-      );
+      _totalCount = await widget.vocabService.getTotalCount(learnedStatus: null);
       
-      // 2. Calculate total pages (e.g., 50 words / 100 per page = 1 page)
-      int calculatedPages = (count / _itemsPerPage).ceil();
-      if (calculatedPages == 0) calculatedPages = 1;
+      _totalPages = (_totalCount / _itemsPerPage).ceil();
+      if (_totalPages == 0) _totalPages = 1;
 
-      // 3. Calculate offset for SQL: (Page - 1) * Limit
-      int offset = (_currentPage - 1) * _itemsPerPage;
-      
-      List<Vocab> fetchedWords;
-      if (_filterLearned == null) {
-        // Fetch All
-        fetchedWords = await widget.vocabService.getMany(limit: _itemsPerPage, offset: offset);
-      } else {
-        // Fetch Filtered (Learned or Unlearned)
-        fetchedWords = await widget.vocabService.getWhereLearned(
-          isLearned: _filterLearned == 1,
+      for (int page = 1; page <= _totalPages; page++) {
+        int offset = (page - 1) * _itemsPerPage;
+        // ดึงข้อมูลคำศัพท์ของหน้านั้นๆ มาเช็ก
+        List<Vocab> pageWords = await widget.vocabService.getMany(
           limit: _itemsPerPage,
           offset: offset,
-          newestFirst: _newestFirst,
         );
+        int learnedInPage = pageWords.where((v) => v.isLearned).length;
+        _pageLearnedCounts[page] = learnedInPage;
       }
+
+      await _fetchData();
+    } catch (e) {
+      debugPrint("Initial Fetch Error: $e");
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _fetchData() async {
+    setState(() => _isLoading = true);
+    try {
+      int offset = (_currentPage - 1) * _itemsPerPage;
+      
+      List<Vocab> fetchedWords = await widget.vocabService.getMany(
+        limit: _itemsPerPage,
+        offset: offset,
+      );
+
+      _pageLearnedCounts[_currentPage] = fetchedWords.where((v) => v.isLearned).length;
 
       if (mounted) {
         setState(() {
-          _totalCount = count;
-          _totalPages = calculatedPages;
           _words = fetchedWords;
           _isLoading = false;
         });
         _scrollToCurrentPageIndicator();
       }
     } catch (e) {
-      debugPrint("Dictionary Error: $e");
-      setState(() => _isLoading = false);
+      debugPrint("Fetch Error: $e");
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  /// Handles page selection and data reloading
   void _changePage(int newPage) {
-    if (newPage < 1 || newPage > _totalPages) return;
+    if (newPage < 1 || newPage > _totalPages || _isLoading) return;
     setState(() => _currentPage = newPage);
-    _refreshData();
+    _fetchData();
   }
 
-  /// Automatically scrolls the horizontal page bar to keep current page visible
   void _scrollToCurrentPageIndicator() {
-    if (_pageScrollController.hasClients) {
-      double position = (_currentPage - 1) * 54.0; // Width + Margin
-      _pageScrollController.animateTo(
-        position,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_pageScrollController.hasClients) {
+        double position = (_currentPage - 1) * 54.0;
+        _pageScrollController.animateTo(
+          position, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut,
+        );
+      }
+    });
   }
 
   @override
@@ -107,83 +106,57 @@ class _DictionaryPageState extends State<DictionaryPage> {
     return Scaffold(
       appBar: AppBar(
         title: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Text("Dictionary", style: TextStyle(fontSize: 18)),
-            Text("$_totalCount words found", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            const Text("Dictionary", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text("$_totalCount words", style: const TextStyle(fontSize: 12, color: Colors.grey)),
           ],
         ),
         centerTitle: true,
-        actions: [
-          PopupMenuButton<int?>(
-            icon: const Icon(Icons.filter_list),
-            onSelected: (val) {
-              setState(() {
-                if (val == 21) { _filterLearned = 1; _newestFirst = true; }
-                else if (val == 22) { _filterLearned = 1; _newestFirst = false; }
-                else { _filterLearned = val; }
-              });
-              _refreshData(resetPage: true);
-            },
-            itemBuilder: (ctx) => [
-              const PopupMenuItem(value: null, child: Text("Show All Words")),
-              const PopupMenuItem(value: 21, child: Text("Learned (Newest First)")),
-              const PopupMenuItem(value: 22, child: Text("Learned (Oldest First)")),
-              const PopupMenuItem(value: 0, child: Text("Not Learned Yet")),
-            ],
-          )
-        ],
       ),
       body: Column(
         children: [
-          // Vocabulary List
           Expanded(
             child: _isLoading 
               ? const Center(child: CircularProgressIndicator())
               : _words.isEmpty 
-                ? const Center(child: Text("No words found here."))
+                ? const Center(child: Text("No data found"))
                 : ListView.separated(
                     itemCount: _words.length,
-                    separatorBuilder: (ctx, i) => const Divider(height: 1),
-                    itemBuilder: (ctx, i) {
-                      final v = _words[i];
-                      return ListTile(
-                        leading: Icon(
-                          v.isLearned ? Icons.check_circle : Icons.circle_outlined,
-                          color: v.isLearned ? Colors.green : Colors.grey.shade300,
-                        ),
-                        title: Text(v.word, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(v.translated),
-                        trailing: const Icon(Icons.chevron_right, size: 16),
-                        onTap: () => _showDetail(v),
-                      );
-                    },
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (ctx, i) => _buildVocabTile(_words[i]),
                   ),
           ),
-          
-          // Horizontal Page Selector
           _buildPaginationBar(),
         ],
       ),
     );
   }
 
-  Widget _buildPaginationBar() {
-    // Hide if everything fits on one page
-    if (_totalPages <= 1) return const SizedBox.shrink();
+  Widget _buildVocabTile(Vocab v) {
+    return ListTile(
+      leading: Icon(
+        v.isLearned ? Icons.check_circle : Icons.circle_outlined,
+        color: v.isLearned ? Colors.green : Colors.grey.shade300,
+      ),
+      title: Text(v.word, style: const TextStyle(fontWeight: FontWeight.bold)),
+      subtitle: Text(v.translated),
+      onTap: () => _showDetail(v),
+    );
+  }
 
+  Widget _buildPaginationBar() {
+    if (_totalPages <= 1) return const SizedBox.shrink();
     return Container(
-      height: 70,
+      height: 65,
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5)],
+        color: Colors.white, 
+        border: Border(top: BorderSide(color: Colors.grey.shade200))
       ),
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.chevron_left),
-            onPressed: _currentPage > 1 ? () => _changePage(_currentPage - 1) : null,
+            icon: const Icon(Icons.chevron_left), 
+            onPressed: _currentPage > 1 ? () => _changePage(_currentPage - 1) : null
           ),
           Expanded(
             child: ListView.builder(
@@ -192,25 +165,55 @@ class _DictionaryPageState extends State<DictionaryPage> {
               itemCount: _totalPages,
               itemBuilder: (ctx, i) {
                 int p = i + 1;
-                bool active = _currentPage == p;
+                bool isActive = _currentPage == p;
+                
+                int learnedCount = _pageLearnedCounts[p] ?? 0;
+                
+                int totalInPage = (p == _totalPages) 
+                    ? (_totalCount % _itemsPerPage == 0 ? _itemsPerPage : _totalCount % _itemsPerPage)
+                    : _itemsPerPage;
+                
+                double progressPercent = totalInPage > 0 ? (learnedCount / totalInPage) : 0.0;
+
                 return GestureDetector(
                   onTap: () => _changePage(p),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
+                  child: Container(
                     width: 46,
-                    margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-                    alignment: Alignment.center,
+                    height: 46,
+                    margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 8),
                     decoration: BoxDecoration(
-                      color: active ? Colors.deepPurple : Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: active ? Colors.deepPurple : Colors.grey.shade300),
-                    ),
-                    child: Text(
-                      "$p",
-                      style: TextStyle(
-                        color: active ? Colors.white : Colors.black87,
-                        fontWeight: active ? FontWeight.bold : FontWeight.normal
+                      border: Border.all(
+                        color: isActive ? Colors.deepPurple.shade700 : Colors.grey.shade300,
+                        width: isActive ? 2.5 : 1,
                       ),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: FractionallySizedBox(
+                            alignment: Alignment.bottomCenter,
+                            heightFactor: progressPercent,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade400,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Center(
+                          child: Text(
+                            "$p",
+                            style: TextStyle(
+                              // ถ้าสีเขียวขึ้นมาเกินครึ่งหน้า ให้เปลี่ยนเลขเป็นสีขาวเพื่อให้ยังมองเห็นชัด
+                              color: progressPercent > 0.5 ? Colors.white : Colors.black87,
+                              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                              fontSize: isActive ? 15 : 14,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 );
@@ -218,58 +221,129 @@ class _DictionaryPageState extends State<DictionaryPage> {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.chevron_right),
-            onPressed: _currentPage < _totalPages ? () => _changePage(_currentPage + 1) : null,
+            icon: const Icon(Icons.chevron_right), 
+            onPressed: _currentPage < _totalPages ? () => _changePage(_currentPage + 1) : null
           ),
         ],
       ),
     );
   }
 
+  /// Shows the vocabulary detail in a BottomSheet with full information
   void _showDetail(Vocab vocab) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          left: 24,
+          right: 24,
+          top: 24,
+          bottom: MediaQuery.of(ctx).padding.bottom + 24, 
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
-            const SizedBox(height: 20),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
               children: [
-                Expanded(child: Text(vocab.word, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold))),
-                IconButton(
-                  icon: const Icon(Icons.volume_up, size: 32, color: Colors.deepPurple),
-                  onPressed: () => _tts.speak(vocab.word),
+                Expanded(
+                  child: Text(
+                    vocab.word,
+                    style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.black87),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.deepPurple.shade50,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    vocab.partOfSpeech.toLowerCase(),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.deepPurple.shade700),
+                  ),
                 ),
               ],
             ),
-            Text(vocab.partOfSpeech.toUpperCase(), style: const TextStyle(color: Colors.deepPurple, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-            const Divider(height: 40),
-            _detailItem("Translation", vocab.translated),
-            _detailItem("Definition (EN)", vocab.definitionEn),
-            _detailItem("Example Sentence", vocab.exampleSentence),
+            const SizedBox(height: 16),
+
+            Text(
+              "ความหมาย: ${vocab.translated}",
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: Colors.black87),
+            ),
+            const Divider(height: 24, thickness: 1),
+
+            if (vocab.definitionEn.isNotEmpty) ...[
+              const Text("Definition:", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const SizedBox(height: 4),
+              Text(
+                vocab.definitionEn,
+                style: const TextStyle(fontSize: 16, color: Colors.black87, height: 1.3),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            if (vocab.exampleSentence.isNotEmpty) ...[
+              const Text("Example Sentence:", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey)),
+              const SizedBox(height: 4),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Text(
+                  vocab.exampleSentence,
+                  style: TextStyle(fontSize: 15, fontStyle: FontStyle.italic, color: Colors.grey.shade800, height: 1.3),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+
+            Row(
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      const Icon(Icons.psychology, size: 20, color: Colors.orange),
+                      const SizedBox(width: 6),
+                      Text(
+                        "Strength: ${vocab.strength}",
+                        style: const TextStyle(fontSize: 14, color: Colors.black54),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: () => _tts.speak(vocab.word),
+                icon: const Icon(Icons.volume_up, color: Colors.white),
+                label: const Text("Pronounce", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _detailItem(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: TextStyle(color: Colors.grey.shade500, fontSize: 12, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          Text(value.isEmpty ? "No data available" : value, style: const TextStyle(fontSize: 18, height: 1.4)),
-        ],
       ),
     );
   }
