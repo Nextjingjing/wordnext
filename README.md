@@ -59,8 +59,6 @@ flutter build windows
 
 ### Android
 
-### Windows
-
 ให้ใช้ Branch `main`
 
 ```bash
