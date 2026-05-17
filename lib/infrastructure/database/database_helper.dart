@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:path_provider/path_provider.dart';
 
 /// Manages the SQLite database connection and initialization.
 /// Handles the initial copying of the pre-populated database from assets.
@@ -20,8 +21,14 @@ class DatabaseHelper {
 
   /// Initializes the database by copying it from assets if it doesn't exist in the local storage.
   Future<Database> _initDB(String fileName) async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, fileName);
+    String path;
+    if (Platform.isWindows) {
+      final docDir = await getApplicationDocumentsDirectory();
+      path = join(docDir.path, 'WordNext', fileName);
+    } else {
+      final dbPath = await getDatabasesPath();
+      path = join(dbPath, fileName);
+    }
 
     // Check if the database already exists in the device's storage
     final exists = await databaseExists(path);
@@ -32,7 +39,7 @@ class DatabaseHelper {
         await Directory(dirname(path)).create(recursive: true);
         
         // Load the database file from the application's assets
-        ByteData data = await rootBundle.load(join("assets", fileName));
+        ByteData data = await rootBundle.load("assets/$fileName");
         List<int> bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
         
         // Write the database file to the local storage
